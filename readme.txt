@@ -19,7 +19,7 @@ Pensé au départ pour un site de karting, le plugin est extensible pour accueil
 Fonctionnalités :
 
 * Remplacement du curseur par un kart animé (image fournie).
-* Rotation du kart en fonction de la direction du mouvement.
+* Rotation du kart en fonction de la direction du mouvement (à plat sur la route, légère inclinaison max. 22°).
 * Effet de fumée réglable (faible, moyenne, forte) ou désactivable.
 * Page de réglages dédiée dans Réglages → Curseur animé.
 * Activation ou désactivation globale.

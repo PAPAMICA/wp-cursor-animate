@@ -31,6 +31,7 @@ body.wca-active.wca-over-clickable .wca-layer {
 	background-repeat: no-repeat;
 	background-position: center;
 	background-size: contain;
+	transform-origin: center center;
 	will-change: transform;
 	opacity: 0;
 	transition: opacity 0.15s ease;

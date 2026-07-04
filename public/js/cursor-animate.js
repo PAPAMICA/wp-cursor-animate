@@ -1,5 +1,5 @@
 /**
- * Curseur animé Kart — suivi du pointeur, rotation directionnelle et fumée.
+ * Curseur animé Kart — suivi du pointeur, orientation horizontale et fumée.
  *
  * La configuration est fournie par wp_localize_script dans window.wcaConfig.
  */
@@ -37,14 +37,6 @@
 		return true;
 	}
 
-	function clampAngleNoDownward( angle ) {
-		// Reflète le demi-plan inférieur vers le haut : le kart ne pointe jamais vers le bas.
-		if ( angle > 0 && angle < 180 ) {
-			return -angle;
-		}
-		return angle;
-	}
-
 	function CursorAnimator() {
 		this.size = config.size || 48;
 		this.smoothing = reduceMotion ? 1 : ( config.smoothing || 0.18 );
@@ -57,8 +49,11 @@
 		this.current = { x: this.target.x, y: this.target.y };
 		this.prev = { x: this.current.x, y: this.current.y };
 
-		this.angle = 0;
-		this.targetAngle = 0;
+		// Orientation route : gauche/droite + légère inclinaison selon le mouvement.
+		this.facingRight = true;
+		this.tilt = 0;
+		this.targetTilt = 0;
+		this.maxTilt = typeof config.maxTilt === 'number' ? config.maxTilt : 22;
 		this.hasMoved = false;
 		this.visible = false;
 		this.overClickable = false;
@@ -152,18 +147,27 @@
 		var dy = this.current.y - this.prev.y;
 		var speed = Math.sqrt( dx * dx + dy * dy );
 
-		// Met à jour l'angle seulement si le mouvement est significatif,
-		// pour éviter que le kart pivote au repos.
+		// Sens horizontal + inclinaison légère (jamais vertical ni à l'envers).
 		if ( speed > 0.4 ) {
-			this.targetAngle = clampAngleNoDownward( Math.atan2( dy, dx ) * 180 / Math.PI );
+			if ( Math.abs( dx ) > 0.3 ) {
+				this.facingRight = dx >= 0;
+			}
+
+			var rawTilt = ( dy / speed ) * this.maxTilt;
+			rawTilt = Math.max( -this.maxTilt, Math.min( this.maxTilt, rawTilt ) );
+			this.targetTilt = this.facingRight ? rawTilt : -rawTilt;
+		} else {
+			this.targetTilt = 0;
 		}
 
-		this.angle = clampAngleNoDownward( this.lerpAngle( this.angle, this.targetAngle, reduceMotion ? 1 : 0.2 ) );
+		this.tilt += ( this.targetTilt - this.tilt ) * ( reduceMotion ? 1 : 0.18 );
 
 		if ( ! this.overClickable ) {
 			var half = this.size / 2;
+			var scaleX = this.facingRight ? 1 : -1;
 			this.kart.style.transform =
-				'translate(' + ( this.current.x - half ) + 'px, ' + ( this.current.y - half ) + 'px) rotate(' + this.angle + 'deg)';
+				'translate(' + ( this.current.x - half ) + 'px, ' + ( this.current.y - half ) + 'px) ' +
+				'scaleX(' + scaleX + ') rotate(' + this.tilt.toFixed( 2 ) + 'deg)';
 
 			if ( this.smokeEnabled && this.visible ) {
 				this.maybeEmitSmoke( now, speed );
@@ -173,14 +177,6 @@
 		this.updateParticles();
 
 		requestAnimationFrame( this.loop );
-	};
-
-	/**
-	 * Interpolation angulaire avec gestion du passage 180/-180.
-	 */
-	CursorAnimator.prototype.lerpAngle = function ( from, to, t ) {
-		var diff = ( ( to - from + 540 ) % 360 ) - 180;
-		return from + diff * t;
 	};
 
 	CursorAnimator.prototype.maybeEmitSmoke = function ( now, speed ) {
@@ -200,14 +196,18 @@
 		// Rafales multiples uniquement au niveau maximal.
 		var burst = intensity >= 1.2 ? 4 : 1;
 
-		var rad = ( this.angle + 180 ) * Math.PI / 180;
 		var back = this.size * 0.42;
+		var tiltRad = this.tilt * Math.PI / 180;
+		var facingSign = this.facingRight ? 1 : -1;
+		var backX = -facingSign * Math.cos( tiltRad ) * back;
+		var backY = -Math.sin( tiltRad ) * back;
 		var spread = this.size * ( 0.2 + intensity * 0.12 );
 
 		for ( var i = 0; i < burst; i++ ) {
-			var jitter = ( Math.random() - 0.5 ) * spread;
-			var px = this.current.x + Math.cos( rad ) * back + Math.cos( rad + Math.PI / 2 ) * jitter;
-			var py = this.current.y + Math.sin( rad ) * back + Math.sin( rad + Math.PI / 2 ) * jitter;
+			var jitterX = ( Math.random() - 0.5 ) * spread;
+			var jitterY = ( Math.random() - 0.5 ) * spread * 0.45;
+			var px = this.current.x + backX + jitterX;
+			var py = this.current.y + backY + jitterY;
 			this.spawnParticle( px, py, intensity );
 		}
 	};

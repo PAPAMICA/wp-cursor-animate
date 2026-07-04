@@ -114,6 +114,7 @@ class WCA_Frontend {
 				'smokeEnabled'   => (bool) $settings['smoke_enabled'],
 				'smokeIntensity' => (float) $intensity,
 				'nativeOnClickable' => (bool) $settings['native_on_clickable'],
+				'maxTilt'           => 22,
 			)
 		);
 	}
