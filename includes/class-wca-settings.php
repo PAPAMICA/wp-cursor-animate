@@ -32,6 +32,7 @@ class WCA_Settings {
 			'smoothing'       => 0.18,
 			'smoke_enabled'   => 1,
 			'smoke_intensity' => 'medium',
+			'native_on_clickable' => 1,
 		);
 	}
 
@@ -81,6 +82,7 @@ class WCA_Settings {
 
 		$clean['enabled']       = empty( $input['enabled'] ) ? 0 : 1;
 		$clean['smoke_enabled'] = empty( $input['smoke_enabled'] ) ? 0 : 1;
+		$clean['native_on_clickable'] = empty( $input['native_on_clickable'] ) ? 0 : 1;
 
 		$mode                = isset( $input['page_mode'] ) ? (string) $input['page_mode'] : $defaults['page_mode'];
 		$clean['page_mode']  = in_array( $mode, array( 'all', 'include', 'exclude' ), true ) ? $mode : $defaults['page_mode'];

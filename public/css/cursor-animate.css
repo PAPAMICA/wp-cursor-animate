@@ -2,9 +2,18 @@
  * Curseur animé Kart — styles frontend.
  */
 
-body.wca-active,
-body.wca-active * {
+body.wca-active:not( .wca-over-clickable ),
+body.wca-active:not( .wca-over-clickable ) * {
 	cursor: none !important;
+}
+
+body.wca-active.wca-over-clickable,
+body.wca-active.wca-over-clickable * {
+	cursor: revert !important;
+}
+
+body.wca-active.wca-over-clickable .wca-layer {
+	visibility: hidden;
 }
 
 .wca-layer {

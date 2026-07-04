@@ -171,6 +171,14 @@ class WCA_Admin {
 			self::PAGE_SLUG,
 			'wca_section_options'
 		);
+
+		add_settings_field(
+			'wca_native_on_clickable',
+			__( 'Curseur natif sur éléments cliquables', 'wp-cursor-animate' ),
+			array( $this, 'field_native_on_clickable' ),
+			self::PAGE_SLUG,
+			'wca_section_options'
+		);
 	}
 
 	/**
@@ -397,6 +405,19 @@ class WCA_Admin {
 				</option>
 			<?php endforeach; ?>
 		</select>
+		<?php
+	}
+
+	/**
+	 * Champ : curseur natif au survol d'éléments cliquables.
+	 */
+	public function field_native_on_clickable() {
+		$settings = WCA_Settings::get();
+		?>
+		<label>
+			<input type="checkbox" name="<?php echo esc_attr( $this->name( 'native_on_clickable' ) ); ?>" value="1" <?php checked( 1, $settings['native_on_clickable'] ); ?> />
+			<?php esc_html_e( 'Rétablir le curseur normal (pointeur, texte, etc.) au survol des liens, boutons et champs de formulaire.', 'wp-cursor-animate' ); ?>
+		</label>
 		<?php
 	}
 }

@@ -26,6 +26,7 @@ Fonctionnalités :
 * Ciblage par pages : toutes les pages, uniquement une sélection, ou toutes sauf une sélection.
 * Image de curseur personnalisée via la médiathèque.
 * Réglages de taille et de fluidité.
+* Curseur natif automatique au survol des liens, boutons et champs (optionnel).
 
 Comportements automatiques :
 

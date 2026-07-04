@@ -18,11 +18,39 @@
 		reduceMotion = window.matchMedia( '( prefers-reduced-motion: reduce )' ).matches;
 	}
 
+	var CLICKABLE_SELECTOR = 'a[href], button, input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, label[for], [role="button"], [role="link"], [onclick]';
+
+	function isClickableElement( el ) {
+		if ( ! el || el === document.documentElement || el === document.body ) {
+			return false;
+		}
+		if ( el.closest( '.wca-layer' ) ) {
+			return false;
+		}
+		var match = el.closest( CLICKABLE_SELECTOR );
+		if ( ! match ) {
+			return false;
+		}
+		if ( match.matches( 'a[href]' ) && match.getAttribute( 'href' ) === '' ) {
+			return false;
+		}
+		return true;
+	}
+
+	function clampAngleNoDownward( angle ) {
+		// Reflète le demi-plan inférieur vers le haut : le kart ne pointe jamais vers le bas.
+		if ( angle > 0 && angle < 180 ) {
+			return -angle;
+		}
+		return angle;
+	}
+
 	function CursorAnimator() {
 		this.size = config.size || 48;
 		this.smoothing = reduceMotion ? 1 : ( config.smoothing || 0.18 );
 		this.smokeEnabled = ! reduceMotion && !! config.smokeEnabled;
 		this.smokeIntensity = config.smokeIntensity || 0.7;
+		this.nativeOnClickable = !! config.nativeOnClickable;
 
 		// Position cible (curseur réel) et position lissée (kart affiché).
 		this.target = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
@@ -33,6 +61,7 @@
 		this.targetAngle = 0;
 		this.hasMoved = false;
 		this.visible = false;
+		this.overClickable = false;
 
 		this.particles = [];
 		this.lastEmit = 0;
@@ -71,7 +100,13 @@
 			self.target.x = e.clientX;
 			self.target.y = e.clientY;
 			self.hasMoved = true;
-			if ( ! self.visible ) {
+
+			if ( self.nativeOnClickable ) {
+				var hit = document.elementFromPoint( e.clientX, e.clientY );
+				self.setOverClickable( isClickableElement( hit ) );
+			}
+
+			if ( ! self.visible && ! self.overClickable ) {
 				self.visible = true;
 				self.kart.classList.add( 'is-visible' );
 			}
@@ -84,11 +119,24 @@
 		} );
 
 		document.addEventListener( 'mouseenter', function () {
-			if ( self.hasMoved ) {
+			if ( self.hasMoved && ! self.overClickable ) {
 				self.visible = true;
 				self.kart.classList.add( 'is-visible' );
 			}
 		} );
+	};
+
+	CursorAnimator.prototype.setOverClickable = function ( isOver ) {
+		if ( this.overClickable === isOver ) {
+			return;
+		}
+		this.overClickable = isOver;
+		document.body.classList.toggle( 'wca-over-clickable', isOver );
+		if ( isOver ) {
+			this.kart.classList.remove( 'is-visible' );
+		} else if ( this.hasMoved ) {
+			this.kart.classList.add( 'is-visible' );
+		}
 	};
 
 	CursorAnimator.prototype.loop = function ( now ) {
@@ -107,18 +155,19 @@
 		// Met à jour l'angle seulement si le mouvement est significatif,
 		// pour éviter que le kart pivote au repos.
 		if ( speed > 0.4 ) {
-			this.targetAngle = Math.atan2( dy, dx ) * 180 / Math.PI;
+			this.targetAngle = clampAngleNoDownward( Math.atan2( dy, dx ) * 180 / Math.PI );
 		}
 
-		this.angle = this.lerpAngle( this.angle, this.targetAngle, reduceMotion ? 1 : 0.2 );
+		this.angle = clampAngleNoDownward( this.lerpAngle( this.angle, this.targetAngle, reduceMotion ? 1 : 0.2 ) );
 
-		// Le hotspot (point de clic) est le centre de l'image ; on centre le kart.
-		var half = this.size / 2;
-		this.kart.style.transform =
-			'translate(' + ( this.current.x - half ) + 'px, ' + ( this.current.y - half ) + 'px) rotate(' + this.angle + 'deg)';
+		if ( ! this.overClickable ) {
+			var half = this.size / 2;
+			this.kart.style.transform =
+				'translate(' + ( this.current.x - half ) + 'px, ' + ( this.current.y - half ) + 'px) rotate(' + this.angle + 'deg)';
 
-		if ( this.smokeEnabled && this.visible ) {
-			this.maybeEmitSmoke( now, speed );
+			if ( this.smokeEnabled && this.visible ) {
+				this.maybeEmitSmoke( now, speed );
+			}
 		}
 
 		this.updateParticles();
@@ -139,27 +188,37 @@
 			return;
 		}
 
-		// Intervalle d'émission modulé par l'intensité (plus fort = plus fréquent).
-		var interval = 90 - this.smokeIntensity * 60;
+		var intensity = this.smokeIntensity;
+
+		// Plus l'intensité est haute, plus l'émission est fréquente.
+		var interval = Math.max( 8, 95 - intensity * 58 );
 		if ( now - this.lastEmit < interval ) {
 			return;
 		}
 		this.lastEmit = now;
 
-		// L'arrière du kart est à l'opposé de la direction (angle + 180°).
+		// Rafales multiples uniquement au niveau maximal.
+		var burst = intensity >= 1.2 ? 4 : 1;
+
 		var rad = ( this.angle + 180 ) * Math.PI / 180;
 		var back = this.size * 0.42;
-		var jitter = ( Math.random() - 0.5 ) * this.size * 0.25;
-		var px = this.current.x + Math.cos( rad ) * back + Math.cos( rad + Math.PI / 2 ) * jitter;
-		var py = this.current.y + Math.sin( rad ) * back + Math.sin( rad + Math.PI / 2 ) * jitter;
+		var spread = this.size * ( 0.2 + intensity * 0.12 );
 
-		this.spawnParticle( px, py );
+		for ( var i = 0; i < burst; i++ ) {
+			var jitter = ( Math.random() - 0.5 ) * spread;
+			var px = this.current.x + Math.cos( rad ) * back + Math.cos( rad + Math.PI / 2 ) * jitter;
+			var py = this.current.y + Math.sin( rad ) * back + Math.sin( rad + Math.PI / 2 ) * jitter;
+			this.spawnParticle( px, py, intensity );
+		}
 	};
 
-	CursorAnimator.prototype.spawnParticle = function ( x, y ) {
+	CursorAnimator.prototype.spawnParticle = function ( x, y, intensity ) {
+		intensity = intensity || this.smokeIntensity;
+
 		var el = document.createElement( 'span' );
 		el.className = 'wca-puff';
-		var base = this.size * ( 0.18 + Math.random() * 0.14 );
+		var sizeMul = 0.85 + intensity * 0.3;
+		var base = this.size * ( 0.18 + Math.random() * 0.14 ) * sizeMul;
 		el.style.width = base + 'px';
 		el.style.height = base + 'px';
 		el.style.left = ( x - base / 2 ) + 'px';
@@ -169,10 +228,11 @@
 		this.particles.push( {
 			el: el,
 			born: performance.now(),
-			life: 550 + Math.random() * 300,
-			drift: ( Math.random() - 0.5 ) * 20,
-			rise: 8 + Math.random() * 14,
-			maxScale: 1.6 + Math.random() * 0.9
+			life: 500 + intensity * 180 + Math.random() * 280,
+			drift: ( Math.random() - 0.5 ) * ( 16 + intensity * 10 ),
+			rise: 8 + Math.random() * ( 10 + intensity * 8 ),
+			maxScale: 1.5 + intensity * 0.35 + Math.random() * 0.8,
+			maxOpacity: Math.min( 0.82, 0.32 + intensity * 0.32 )
 		} );
 	};
 
@@ -195,7 +255,8 @@
 			var scale = 1 + ( p.maxScale - 1 ) * progress;
 			var tx = p.drift * progress;
 			var ty = -p.rise * progress;
-			p.el.style.opacity = String( ( 1 - progress ) * 0.5 );
+			var peakOpacity = p.maxOpacity || 0.5;
+			p.el.style.opacity = String( ( 1 - progress ) * peakOpacity );
 			p.el.style.transform = 'translate(' + tx + 'px, ' + ty + 'px) scale(' + scale + ')';
 		}
 	};

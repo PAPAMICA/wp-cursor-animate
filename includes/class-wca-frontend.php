@@ -100,7 +100,7 @@ class WCA_Frontend {
 		$intensity_map = array(
 			'low'    => 0.35,
 			'medium' => 0.7,
-			'high'   => 1,
+			'high'   => 1.5,
 		);
 		$intensity     = isset( $intensity_map[ $settings['smoke_intensity'] ] ) ? $intensity_map[ $settings['smoke_intensity'] ] : 0.7;
 
@@ -113,6 +113,7 @@ class WCA_Frontend {
 				'smoothing'      => (float) $settings['smoothing'],
 				'smokeEnabled'   => (bool) $settings['smoke_enabled'],
 				'smokeIntensity' => (float) $intensity,
+				'nativeOnClickable' => (bool) $settings['native_on_clickable'],
 			)
 		);
 	}
